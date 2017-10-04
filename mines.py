@@ -8,6 +8,7 @@ class Board:
 	FLAGGED = 2
 	MINE = 4
 
+	# Setup
 	def __init__(self, size):
 		self.height = size[0]
 		self.width = size[1]
@@ -19,89 +20,42 @@ class Board:
 			j = random.randint(0, self.width - 1)
 			self.grid[i,j] = self.MINE
 
+	# Getters
 	def mine_count(self):
 		ret = 0
-		for i in range(self.height):
-			for j in range(self.width):
-				ret += self.cell_mines((i,j))
+		for (i,j), cell in np.ndenumerate(self.grid):
+			ret += self.cell_mines((i,j))
 		return ret
 
 	def flag_count(self):
 		ret = 0
-		for i in range(self.height):
-			for j in range(self.width):
-				if int(self.grid[i,j]) & self.FLAGGED:
-					ret += 1
+		for (i,j), cell in np.ndenumerate(self.grid):
+			if int(cell) & self.FLAGGED:
+				ret += 1
 		return ret
 
 	def correct_flag_count(self):
 		ret = 0
-		for i in range(self.height):
-			for j in range(self.width):
-				if int(self.grid[i,j]) & self.FLAGGED:
-					ret += self.cell_mines((i,j))
+		for (i,j), cell in np.ndenumerate(self.grid):
+			if int(cell) & self.FLAGGED:
+				ret += self.cell_mines((i,j))
 		return ret
 
 	def fully_sweeped(self):
-		for i in range(self.height):
-			for j in range(self.width):
-				cell = int(self.grid[i,j])
-				if not cell & self.SWEEPED:
-					if cell & self.FLAGGED and self.cell_mines((i,j)) > 0:
-						continue
-					return False
+		for (i,j), cell in np.ndenumerate(self.grid):
+			cell = int(cell)
+			if not cell & self.SWEEPED:
+				if cell & self.FLAGGED and self.cell_mines((i,j)) > 0:
+					continue
+				return False
 		return True
 
 	def mine_triggered(self):
-		for i in range(self.height):
-			for j in range(self.width):
-				cell = int(self.grid[i,j])
-				if cell & self.SWEEPED and cell & self.MINE:
-					return True
+		for (i,j), cell in np.ndenumerate(self.grid):
+			cell = int(cell)
+			if cell & self.SWEEPED and cell & self.MINE:
+				return True
 		return False
-
-	
-	def draw_cell(self, coord):
-		cell = int(self.grid[coord])
-		if cell & self.SWEEPED:
-			if cell & self.MINE:
-				return "*"
-			else:
-				adjacent = self.count_adjacent(coord)
-				if adjacent == 0:
-					return " "
-				return str(adjacent)
-		elif cell & self.FLAGGED:
-			return "X"
-		else:
-			return "."
-
-	def sweep_cell(self, coord):
-		if coord[0] < 0 or coord[0] >= self.height or coord[1] < 0 or coord[1] >= self.width:
-			return 0
-		cell = int(self.grid[coord])
-		if cell & self.SWEEPED:
-			return
-		self.grid[coord] = cell | 1
-		mines = self.cell_mines(coord)
-		adjacent = self.count_adjacent(coord)
-		if mines == 0 and adjacent == 0:
-			self.sweep_adjacent_cells(coord)
-		return mines
-
-	def sweep_adjacent_cells(self, coord):
-		for adjacent in self.get_adjacents(coord):
-			self.sweep_cell(adjacent)
-
-	def flag_cell(self, coord):
-		cell = int(self.grid[coord])
-		self.grid[coord] = cell ^ 2
-
-	def reveal_all_mines(self):
-		for i in range(self.height):
-			for j in range(self.width):
-				if int(self.grid[i,j]) & self.MINE:
-					self.grid[i,j] = int(self.grid[i,j]) | 1
 
 	def cell_mines(self, coord):
 		if coord[0] < 0 or coord[0] >= self.height or coord[1] < 0 or coord[1] >= self.width:
@@ -127,6 +81,49 @@ class Board:
 		for adjacent in self.get_adjacents(coord):
 			ret += self.cell_mines(adjacent)
 		return ret
+
+	def cell_char(self, coord):
+		cell = int(self.grid[coord])
+		if cell & self.SWEEPED:
+			if cell & self.MINE:
+				return "*"
+			else:
+				adjacent = self.count_adjacent(coord)
+				if adjacent == 0:
+					return " "
+				return str(adjacent)
+		elif cell & self.FLAGGED:
+			return "X"
+		else:
+			return "."
+
+	# Actions
+	def sweep_cell(self, coord):
+		if coord[0] < 0 or coord[0] >= self.height or coord[1] < 0 or coord[1] >= self.width:
+			return 0
+		cell = int(self.grid[coord])
+		if cell & self.SWEEPED:
+			return
+		self.grid[coord] = cell | 1
+		mines = self.cell_mines(coord)
+		adjacent = self.count_adjacent(coord)
+		if mines == 0 and adjacent == 0:
+			self.sweep_adjacent_cells(coord)
+		return mines
+
+	def sweep_adjacent_cells(self, coord):
+		for adjacent in self.get_adjacents(coord):
+			self.sweep_cell(adjacent)
+
+	def flag_cell(self, coord):
+		cell = int(self.grid[coord])
+		self.grid[coord] = cell ^ 2
+
+	def reveal_all_mines(self):
+		for (i,j), cell in np.ndenumerate(self.grid):
+			if int(cell) & self.MINE:
+				self.grid[i,j] = int(cell) | 1
+
 
 class Controller:
 	def __init__(self, board):
@@ -186,7 +183,7 @@ class View:
 
 		for i in range(board.height):
 			for j in range(board.width):
-				char = board.draw_cell((i,j))
+				char = board.cell_char((i,j))
 				if char in ('1','2','3','4','5','6','7','8'):
 					color = int(char)
 				elif char == '*':
