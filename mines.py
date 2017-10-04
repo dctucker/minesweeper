@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import curses
+import argparse
 
 
 class Board:
@@ -132,12 +133,12 @@ class Controller:
 		self.alive = True
 
 	def move_cursor(self, direction):
-		new_x = self.cursor[0] + direction[0]
-		if 0 <= new_x and new_x < self.board.width:
-			self.cursor[0] = new_x
-		new_y = self.cursor[1] + direction[1]
-		if 0 <= new_y and new_y < self.board.height:
-			self.cursor[1] = new_y
+		new_i = self.cursor[0] + direction[0]
+		if 0 <= new_i and new_i < self.board.height:
+			self.cursor[0] = new_i
+		new_j = self.cursor[1] + direction[1]
+		if 0 <= new_j and new_j < self.board.width:
+			self.cursor[1] = new_j
 
 	def key_press(self, c):
 		if not self.alive:
@@ -150,7 +151,7 @@ class Controller:
 			self.move_cursor((-1, 0))
 		elif c == curses.KEY_DOWN:
 			self.move_cursor((1, 0))
-		elif c == ord('/'):
+		elif c in ( ord('/'), ord('x') ):
 			self.board.flag_cell((self.cursor[0], self.cursor[1]))
 		elif c == ord(' '):
 			mines = self.board.sweep_cell((self.cursor[0], self.cursor[1]))
@@ -198,8 +199,16 @@ class View:
 
 
 def main(stdscr):
-	board = Board((12,12))
-	board.add_random_mines(8)
+	ap = argparse.ArgumentParser()
+	ap.add_argument("-s", "--size", required=False,  default="12x12", help="Size of the board (e.g. 12x12)")
+	ap.add_argument("-m", "--mines", required=False, type=int, default=8, help="number of mines to add to the board")
+	parsed_args = ap.parse_args()
+	args = vars(parsed_args)
+
+	width, height = args['size'].split('x')
+
+	board = Board((int(height),int(width)))
+	board.add_random_mines(args['mines'])
 	ctrl = Controller(board)
 	view = View(stdscr)
 
