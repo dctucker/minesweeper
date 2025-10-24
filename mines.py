@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
+# pylint: disable=import-error,wrong-import-position
+"""minesweeper"""
 
 import random
-import numpy as np
 import curses
 import argparse
+import numpy as np
 
 class Board:
+	"""model the game board"""
 	SWEEPED = 1
 	FLAGGED = 2
 	MINE = 4
@@ -17,26 +20,34 @@ class Board:
 		self.grid = np.zeros(size, dtype=int)
 
 	def add_random_mines(self, count):
-		for m in range(count):
+		"""adds mines to the board at random positions"""
+		for _ in range(count):
 			i = random.randint(0, self.height - 1)
 			j = random.randint(0, self.width - 1)
+			while self.grid[i,j] == self.MINE:
+				i = random.randint(0, self.height - 1)
+				j = random.randint(0, self.width - 1)
+
 			self.grid[i,j] = self.MINE
 
 	# Getters
 	def mine_count(self):
+		"""return the number of unidentified mines on the board"""
 		ret = 0
-		for (i,j), cell in np.ndenumerate(self.grid):
+		for (i,j), _ in np.ndenumerate(self.grid):
 			ret += self.cell_mines((i,j))
 		return ret
 
 	def flag_count(self):
+		"""return the number of flags placed on the board"""
 		ret = 0
-		for (i,j), cell in np.ndenumerate(self.grid):
+		for _, cell in np.ndenumerate(self.grid):
 			if int(cell) & self.FLAGGED:
 				ret += 1
 		return ret
 
 	def correct_flag_count(self):
+		"""return the number of correctly-flagged mines on the board"""
 		ret = 0
 		for (i,j), cell in np.ndenumerate(self.grid):
 			if int(cell) & self.FLAGGED:
@@ -44,6 +55,7 @@ class Board:
 		return ret
 
 	def fully_sweeped(self):
+		"""return True if the board no longer has any unflagged mines"""
 		for (i,j), cell in np.ndenumerate(self.grid):
 			cell = int(cell)
 			if not cell & self.SWEEPED:
@@ -53,13 +65,15 @@ class Board:
 		return True
 
 	def mine_triggered(self):
-		for (i,j), cell in np.ndenumerate(self.grid):
+		"""return True if sweeping an area has triggered a mine"""
+		for _, cell in np.ndenumerate(self.grid):
 			cell = int(cell)
 			if cell & self.SWEEPED and cell & self.MINE:
 				return True
 		return False
 
 	def cell_mines(self, coord):
+		"""return 1 if a mine is present in a given cell with bounds checking"""
 		if coord[0] < 0 or coord[0] >= self.height or coord[1] < 0 or coord[1] >= self.width:
 			return 0
 		if int(self.grid[coord]) & self.MINE:
@@ -67,6 +81,7 @@ class Board:
 		return 0
 
 	def get_adjacents(self, coord):
+		"""return a list containing the coordinates of all adjacent cells for the given coordinate"""
 		return (
 			( coord[0] - 1 , coord[1] - 1 ),
 			( coord[0]     , coord[1] - 1 ),
@@ -79,6 +94,7 @@ class Board:
 		)
 
 	def count_adjacent(self, coord):
+		"""reutrn the total number of mines in all adjacent cells"""
 		ret = 0
 		for adjacent in self.get_adjacents(coord):
 			ret += self.cell_mines(adjacent)
@@ -86,49 +102,57 @@ class Board:
 
 	# Actions
 	def sweep_cell(self, coord):
+		"""step on a cell, sweep adjacent cells if empty, or return a mine if found"""
 		if coord[0] < 0 or coord[0] >= self.height or coord[1] < 0 or coord[1] >= self.width:
 			return 0
 		cell = int(self.grid[coord])
 		if cell & self.SWEEPED or cell & self.FLAGGED:
 			return 0
-		self.grid[coord] = cell | 1
+		self.grid[coord] = cell | self.SWEEPED
 		mines = self.cell_mines(coord)
 		adjacent = self.count_adjacent(coord)
+
 		if mines == 0 and adjacent == 0:
 			self.sweep_adjacent_cells(coord)
 		return mines
 
 	def sweep_adjacent_cells(self, coord):
+		"""coroutine to sweep all adjacent cells when stepping on an empty cell"""
 		ret = 0
 		for adjacent in self.get_adjacents(coord):
 			ret += self.sweep_cell(adjacent)
 		return ret
 
 	def flag_cell(self, coord):
+		"""plant a flag on the specified cell"""
 		cell = int(self.grid[coord])
-		self.grid[coord] = cell ^ 2
+		self.grid[coord] = cell ^ self.FLAGGED
 
 	def reveal_all_mines(self):
+		"""sweeps all the cells in the grid to reveal all mines and adjacencies"""
 		for (i,j), cell in np.ndenumerate(self.grid):
 			if int(cell) & self.MINE:
-				self.grid[i,j] = int(cell) | 1
+				self.grid[i,j] = int(cell) | self.SWEEPED
 
 
 class Controller:
+	"""provides the methods the allow user interaction with the game model"""
 	def __init__(self, board):
 		self.cursor = [board.height // 2, board.width // 2]
 		self.board = board
 		self.alive = True
 
 	def move_cursor(self, direction):
+		"""adjust the position of the cursor on the screen"""
 		new_i = self.cursor[0] + direction[0]
-		if 0 <= new_i and new_i < self.board.height:
+		if 0 <= new_i < self.board.height:
 			self.cursor[0] = new_i
 		new_j = self.cursor[1] + direction[1]
-		if 0 <= new_j and new_j < self.board.width:
+		if 0 <= new_j < self.board.width:
 			self.cursor[1] = new_j
 
 	def key_press(self, c):
+		"""detect which key has been pressed and take the appropriate action"""
 		mines = 0
 		if not self.alive:
 			return
@@ -153,6 +177,7 @@ class Controller:
 
 
 class View:
+	"""provides the view of the game board"""
 	def __init__(self, screen):
 		self.screen = screen
 		curses.init_pair(1, curses.COLOR_CYAN,    curses.COLOR_BLACK)
@@ -168,6 +193,7 @@ class View:
 		curses.init_pair(11, curses.COLOR_BLUE,   curses.COLOR_BLUE)
 
 	def draw_board(self, board):
+		"""render the game board on the screen, showing flags, mines, empty cells, and adjacencies"""
 		self.screen.clear()
 
 		self.screen.addstr(board.height, 0, ' ' * (board.width*2+1), curses.color_pair(11) )
@@ -195,25 +221,30 @@ class View:
 		self.screen.refresh()
 
 	def cell_char(self, board, coord):
+		"""render a single cell of the game board"""
 		cell = int(board.grid[coord])
 		if cell & board.SWEEPED:
 			if cell & board.MINE:
 				return "*"
-			else:
-				adjacent = board.count_adjacent(coord)
-				if adjacent == 0:
-					return " "
-				return str(adjacent)
-		elif cell & board.FLAGGED:
+			adjacent = board.count_adjacent(coord)
+
+			if adjacent == 0:
+				return " "
+			return str(adjacent)
+
+		if cell & board.FLAGGED:
 			return "X"
-		else:
-			return "."
+
+		return "."
 
 
 def main(stdscr):
+	"""entrypoint"""
 	ap = argparse.ArgumentParser()
-	ap.add_argument("-s", "--size", required=False,  default="12x12", help="Size of the board (e.g. 12x12)")
-	ap.add_argument("-m", "--mines", required=False, type=int, default=8, help="number of mines to add to the board")
+	ap.add_argument("-s", "--size", required=False,  default="12x12",
+		help="Size of the board (e.g. 12x12)")
+	ap.add_argument("-m", "--mines", required=False, type=int, default=8,
+		help="number of mines to add to the board")
 	parsed_args = ap.parse_args()
 	args = vars(parsed_args)
 
