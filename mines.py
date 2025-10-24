@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
+
 import random
 import numpy as np
 import curses
 import argparse
-
 
 class Board:
 	SWEEPED = 1
@@ -13,7 +14,7 @@ class Board:
 	def __init__(self, size):
 		self.height = size[0]
 		self.width = size[1]
-		self.grid = np.zeros(size)
+		self.grid = np.zeros(size, dtype=int)
 
 	def add_random_mines(self, count):
 		for m in range(count):
@@ -115,7 +116,7 @@ class Board:
 
 class Controller:
 	def __init__(self, board):
-		self.cursor = [board.height / 2, board.width / 2]
+		self.cursor = [board.height // 2, board.width // 2]
 		self.board = board
 		self.alive = True
 
